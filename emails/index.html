@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Email Scraper</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: plain working tool, fast on a phone
+   IDEA: a sieve — files in, clean list out
+   PICTURE: the drop zone and the result list itself
+   COLOUR and TYPE: black/white + mint field; Space Grotesk + Inter
+   LAYOUT: one column: drop → count → controls next to list */
+:root{color-scheme:light dark;--bg:light-dark(#fff,#0b0b10);--ink:light-dark(#0b0b10,#f2f2f2);--mut:light-dark(#666,#9a9a9a);--line:light-dark(#e3e3e3,#26262e);--mint:light-dark(#b8f5d0,#b8f5d0);--card:light-dark(#f7f7f7,#15151c)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+.wrap{max-width:860px;margin:0 auto;padding:24px max(4vw,16px) 60px}
+h1{font:700 clamp(30px,6vw,44px)/1.05 'Space Grotesk',sans-serif;margin:0 0 6px}
+p.sub{color:var(--mut);margin:0 0 18px}
+.drop{display:block;width:100%;border:2px dashed var(--line);border-radius:16px;padding:26px 16px;text-align:center;cursor:pointer;background:var(--card)}
+.drop.on{border-color:var(--mint);background:color-mix(in srgb,var(--mint) 18%,var(--card))}
+.drop b{display:block;font-size:18px}
+.drop small{color:var(--mut)}
+textarea{width:100%;min-height:80px;margin-top:10px;font:16px Inter,sans-serif;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.stat{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;background:var(--mint);color:#0b0b10;border-radius:16px;padding:16px 20px;margin:18px 0 12px}
+.stat .n{font:700 clamp(36px,9vw,56px)/1 'Space Grotesk',sans-serif}
+.stat span{font-weight:600}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+button,input[type=search],select{font:600 15px Inter,sans-serif;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 14px}
+button.pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+input[type=search]{flex:1 1 180px;font-weight:400;font-size:16px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
+label.ck{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;color:var(--mut);font-weight:600;border-bottom:1px solid var(--line);padding:8px 6px}
+td{border-bottom:1px solid var(--line);padding:8px 6px;vertical-align:top}
+td.e{font-weight:600;word-break:break-all}
+td.c{color:var(--mut);font-size:13px}
+td.n{text-align:right;white-space:nowrap}
+.files{color:var(--mut);font-size:13px;margin-top:8px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s}
+.toast.on{opacity:1}
+.empty{color:var(--mut);text-align:center;padding:30px 0}
+@media(max-width:600px){.stack thead{display:none}.stack tr{display:grid;padding-block:8px;border-bottom:1px solid var(--line)}.stack td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:12px}.stack td::before{content:attr(data-l);color:var(--mut);font-weight:400}td.n{text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Email Scraper</h1>
+<p class="sub">Load any file — LinkedIn pages, Telegram exports, PDFs, Word, Excel. Everything stays on your device.</p>
+
+<label class="drop" id="drop" for="fi">
+  <b>Tap to choose files, or drop them here</b>
+  <small>HTML, PDF, Word, Excel, CSV, TXT, JSON, EML, VCF — multiple files OK</small>
+  <input type="file" id="fi" multiple hidden>
+</label>
+<textarea id="paste" placeholder="…or paste page text / HTML here"></textarea>
+<div class="files" id="files"></div>
+
+<div class="stat"><span class="n" id="cnt">0</span><span id="cntl">unique emails</span></div>
+
+<div class="bar">
+  <input type="search" id="q" placeholder="Filter (domain, word in context…)">
+  <select id="sort"><option value="n">Most mentions</option><option value="a">A–Z</option><option value="d">By domain</option><option value="f">First seen</option></select>
+</div>
+<div class="bar">
+  <label class="ck"><input type="checkbox" id="nofree"> Hide gmail/hotmail/yahoo/outlook</label>
+</div>
+<div class="bar">
+  <button class="pri" id="cpE">Copy emails</button>
+  <button id="cpC">Copy as CSV</button>
+  <button id="clr">Clear</button>
+</div>
+
+<table class="stack"><thead><tr><th>Email</th><th>Context</th><th>Source</th><th>×</th></tr></thead><tbody id="tb"></tbody></table>
+<div class="empty" id="empty">No emails yet — load a file above.</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+{
+const $=id=>document.getElementById(id);
+const RE=/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24}/g;
+const JUNK=/\.(png|jpe?g|gif|svg|webp|css|js)$|@\dx|example\.(com|org)|sentry|wixpress|linkedin\.com$|telegram\.org$|licdn|w3\.org|schema\.org|domain\.com$|email\.com$/i;
+const FREE=/@(gmail|hotmail|yahoo|outlook|live|icloud|msn|aol)\./i;
+let map=new Map(),order=0,loaded=[];
+
+function textOf(raw){
+  // decode quoted-printable (mhtml) and HTML entities, keep mailto targets
+  raw=raw.replace(/=\r?\n/g,'').replace(/=40/g,'@');
+  let mail=[...raw.matchAll(/mailto:([^"'?&\s>]+)/gi)].map(m=>decodeURIComponent(m[1])).join(' ');
+  let t=raw.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ')
+           .replace(/<br\s*\/?>|<\/(div|p|li|tr)>/gi,'\n').replace(/<[^>]+>/g,' ');
+  const ta=document.createElement('textarea');ta.innerHTML=t;t=ta.value;
+  t=t.replace(/\s*(\[at\]|\(at\)| at )\s*/gi,m=>/\[|\(/.test(m)?'@':m)
+     .replace(/\s*(\[dot\]|\(dot\))\s*/gi,'.');
+  return t+'\n'+mail;
+}
+
+function scan(raw,src){
+  const t=textOf(raw);let m;RE.lastIndex=0;
+  while((m=RE.exec(t))){
+    let e=m[0].toLowerCase().replace(/^[._-]+|[._-]+$/g,'');
+    if(JUNK.test(e))continue;
+    const ctx=t.slice(Math.max(0,m.index-70),m.index+m[0].length+40).replace(/\s+/g,' ').trim();
+    const r=map.get(e);
+    if(r){r.n++;r.src.add(src);}
+    else map.set(e,{e,d:e.split('@')[1],n:1,ctx,src:new Set([src]),o:order++});
+  }
+}
+
+function rows(){
+  const q=$('q').value.toLowerCase(),nf=$('nofree').checked,s=$('sort').value;
+  let a=[...map.values()].filter(r=>(!nf||!FREE.test(r.e))&&(!q||(r.e+' '+r.ctx).toLowerCase().includes(q)));
+  a.sort(s==='n'?(x,y)=>y.n-x.n:s==='a'?(x,y)=>x.e.localeCompare(y.e):s==='d'?(x,y)=>x.d.localeCompare(y.d)||x.e.localeCompare(y.e):(x,y)=>x.o-y.o);
+  return a;
+}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function render(){
+  const a=rows();
+  $('cnt').textContent=a.length;
+  $('cntl').textContent=a.length===map.size?'unique emails':`shown of ${map.size} unique`;
+  $('tb').innerHTML=a.map(r=>`<tr><td class="e" data-l="Email">${esc(r.e)}</td><td class="c" data-l="Context">${esc(r.ctx)}</td><td class="c" data-l="Source">${esc([...r.src].join(', '))}</td><td class="n" data-l="Mentions">${r.n}</td></tr>`).join('');
+  $('empty').style.display=a.length?'none':'block';
+  $('files').textContent=loaded.length?'Loaded: '+loaded.join(' · '):'';
+}
+
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),1600);}
+async function copy(txt,msg){
+  try{await navigator.clipboard.writeText(txt);toast(msg);}
+  catch(e){const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast(msg);}catch(_){toast('Copy blocked — select the table manually');}ta.remove();}
+}
+
+async function readAny(f){
+  const ext=(f.name.split('.').pop()||'').toLowerCase();
+  if(ext==='pdf'){
+    const lib=window.pdfjsLib;lib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const doc=await lib.getDocument({data:await f.arrayBuffer()}).promise;let out='';
+    for(let i=1;i<=doc.numPages;i++){const c=await(await doc.getPage(i)).getTextContent();out+=c.items.map(x=>x.str).join(' ')+'\n';}
+    return out;
+  }
+  if(['docx','pptx'].includes(ext)){
+    const z=await JSZip.loadAsync(await f.arrayBuffer());let out='';
+    for(const n of Object.keys(z.files).filter(n=>/^(word|ppt)\/.*\.xml$/.test(n)))out+=(await z.file(n).async('string')).replace(/<\/w:p>|<\/a:p>/g,'\n')+' ';
+    return out;
+  }
+  if(['xlsx','xls','ods'].includes(ext)){
+    const wb=XLSX.read(await f.arrayBuffer());
+    return wb.SheetNames.map(s=>XLSX.utils.sheet_to_csv(wb.Sheets[s])).join('\n');
+  }
+  return await f.text(); // html, htm, mhtml, txt, csv, json, eml, vcf, md…
+}
+
+async function load(files){
+  for(const f of files){
+    const tag=/linkedin/i.test(f.name)?'LinkedIn':/messages\d*\.html|telegram|result\.json/i.test(f.name)?'Telegram':'';
+    const src=f.name+(tag?` (${tag})`:'');
+    try{scan(await readAny(f),src);loaded.push(f.name);}
+    catch(e){loaded.push(f.name+' ✗ could not read');}
+  }
+  render();
+}
+
+$('fi').addEventListener('change',e=>{load([...e.target.files]);e.target.value='';});
+const d=$('drop');
+['dragover','dragenter'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add('on');}));
+['dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove('on');}));
+d.addEventListener('drop',e=>load([...e.dataTransfer.files]));
+let pt;$('paste').addEventListener('input',e=>{clearTimeout(pt);pt=setTimeout(()=>{
+  for(const[k,r]of map){r.src.delete('pasted');if(!r.src.size)map.delete(k);}
+  if(e.target.value.trim())scan(e.target.value,'pasted');render();},400);});
+['q','sort','nofree'].forEach(id=>$(id).addEventListener('input',render));
+$('cpE').addEventListener('click',()=>copy(rows().map(r=>r.e).join('\n'),'Emails copied'));
+$('cpC').addEventListener('click',()=>{
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  copy(['email,domain,mentions,source,context',...rows().map(r=>[r.e,r.d,r.n,[...r.src].join('; '),r.ctx].map(q).join(','))].join('\n'),'CSV copied — paste into Sheets');
+});
+$('clr').addEventListener('click',()=>{map.clear();loaded=[];order=0;$('paste').value='';render();});
+render();
+}
+</script>
+</body>
+</html>
