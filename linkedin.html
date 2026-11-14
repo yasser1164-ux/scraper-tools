@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LinkedIn Email Grabber</title>
+<style>:root{color-scheme:light dark}body{margin:0;font:17px/1.55 system-ui,sans-serif;background:light-dark(#fff,#0b0b10);color:light-dark(#0b0b10,#f2f2f2)}
+.w{max-width:680px;margin:0 auto;padding:28px 18px 60px}h1{font-size:34px;line-height:1.1;margin:0 0 8px}h2{font-size:20px;margin:28px 0 8px}
+.m{background:#b8f5d0;color:#0b0b10;border-radius:14px;padding:14px 16px;font-weight:600}
+a.bm{display:inline-block;background:#0b0b10;color:#fff;border:2px solid #b8f5d0;padding:12px 18px;border-radius:12px;text-decoration:none;font-weight:700}
+textarea{width:100%;height:110px;font:13px monospace;border-radius:10px;padding:8px;background:light-dark(#f4f4f4,#15151c);color:inherit;border:1px solid #444}
+button{min-height:44px;padding:0 16px;border-radius:10px;border:0;background:#b8f5d0;color:#0b0b10;font-weight:700;font-size:15px;margin-top:8px}
+ol{padding-left:20px}li{margin-bottom:6px}code{background:light-dark(#eee,#222);padding:1px 5px;border-radius:5px}</style></head>
+<body><div class="w">
+<h1>LinkedIn Email Grabber</h1>
+<p class="m">A bookmark button. Scroll LinkedIn normally → tap it → all emails on the screen are copied. Then paste into the <a href="emails/">Email Scraper</a>.</p>
+
+<h2>On PC (Chrome / Edge)</h2>
+<ol><li>Show the bookmarks bar: <code>Ctrl+Shift+B</code></li>
+<li>Drag this button onto the bar: <a class="bm" id="bm" href="#">📋 Grab Emails</a></li></ol>
+
+<h2>On iPhone (Safari)</h2>
+<ol><li>Tap <b>Copy code</b> below.</li>
+<li>Bookmark any page (Share → Add Bookmark), name it <b>Grab Emails</b>.</li>
+<li>Open Bookmarks → Edit → tap <b>Grab Emails</b> → replace the address with the copied code → Done.</li></ol>
+<textarea id="code" readonly></textarea>
+<button id="cp">Copy code</button>
+
+<h2>How to use</h2>
+<ol><li>In LinkedIn search: <code>"send your CV" mechanical engineer</code> → filter <b>Posts</b>, sort <b>Latest</b>.</li>
+<li>Scroll down so many posts load. Tap <b>…see more</b> on posts if the email is hidden.</li>
+<li>Tap the <b>Grab Emails</b> bookmark → it shows how many were copied.</li>
+<li>Open the <a href="emails/">Email Scraper</a> → paste into the box → copy CSV to your sheet.</li></ol>
+<p style="color:#888;font-size:14px">Works on any page — Telegram Web, job sites, company pages too. Use it at normal browsing pace; it only reads what's already on your screen.</p>
+</div>
+<script>
+const js="javascript:(()=>{const t=document.body.innerText;const r=/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}/g;const m=[...new Set((t.match(r)||[]).map(e=>e.toLowerCase()))].filter(e=>!/\\.(png|jpg|gif)$/.test(e));const s=m.join('\\n');if(!m.length){alert('No emails on this page');return}navigator.clipboard.writeText(s).then(()=>alert(m.length+' emails copied')).catch(()=>prompt(m.length+' emails - copy:',m.join(', ')))})()";
+document.getElementById('bm').href=js;document.getElementById('code').value=js;
+document.getElementById('cp').onclick=async()=>{try{await navigator.clipboard.writeText(js);cp.textContent='Copied ✓'}catch(e){code.select();document.execCommand('copy');cp.textContent='Copied ✓'}};
+</script></body></html>
